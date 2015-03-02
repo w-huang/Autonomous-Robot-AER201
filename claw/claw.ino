@@ -20,6 +20,17 @@ void moveGate(Servo* myServo, int state){
   return;
 }
 
+void driveForward(){
+  analogWrite(motorControlPins[0], 255);
+  analogWrite(motorControlPins[1], 255);
+  digitalWrite(motorControlPins[3], LOW);
+  digitalWrite(motorControlPins[2], HIGH);
+  digitalWrite(motorControlPins[5], LOW);
+  digitalWrite(motorControlPins[4], HIGH);
+  return;
+
+}
+
 void driveBack(){
   analogWrite(motorControlPins[0], 255);
   analogWrite(motorControlPins[1], 255);
@@ -48,12 +59,13 @@ void setup(){
   Serial.begin(9600);
   myServo.attach(servoControlPin);
   myServo.write(0);
+  driveForward();
 }
 
 
 void loop(){
   if (IRValue = readIrSensor(IRSensorPin) < 940){//change 940 to adjust closeness/farness of ball detection; IR has a logarithmic scale
-    delay(1500);//delay between seeing ball and closing gate
+    stop();
     moveGate(&myServo, 0); //closes gate
     delay(10000);//delay after closing gate
     driveBack();//drives backward
