@@ -1,18 +1,26 @@
 #include <Servo.h>
+#define TOOCLOSE 1
+#define TOOFAR 0
 
 class robot{
 	public:
 		robot(); //constructor
+		float detectDistances(int);
 		int getCurrentState();
 		bool inputSignal1Pressed;
 		bool inputSignal2Pressed;
 		bool startButtonPressed;
-                void setState(int);
+        void setState(int);
 		void incBallCount();
-		void move(int, int);
+		void moveToHopper();
+		void moveToGameboard();
 		void turnLeft();
 		void turnRight();
-		float detectDistances(int);
+		void stop();
+		void go();
+		void changeOrientation(int);
+		void reAdjust(int, int);
+        void grabBall();
 		void doTaskA();
 		void doTaskB();
 		void doTaskC();
@@ -68,38 +76,46 @@ robot::robot(){
 }
 
 
-float robot::detectDistances(int side){
-        //Serial.println("detectDistances function");
+float robot::detectDistances(int side)  {
+    //Serial.println("detectDistances function");
 	//returns the distance measured by the sonar on the specified side
 	//side key: 0 = front, 1 = left, 2 = back, 3 = right
+	int counter = 0;
 	int offset = side * 2;
 	int duration;
 	float distance;
-
-	digitalWrite(46 + offset,LOW);
-  	delayMicroseconds(5);
-  	digitalWrite(46 + offset, HIGH);
-  	delayMicroseconds(15);
-  	digitalWrite(46 + offset, LOW);
-  	delayMicroseconds(5);  
-	duration = pulseIn(47 + offset, HIGH);
-  	distance = duration/58.2;
-  	
+	while(counter < 5){
+		digitalWrite(46 + offset,LOW);
+	  	delayMicroseconds(5);
+	  	digitalWrite(46 + offset, HIGH);
+	  	delayMicroseconds(15);
+	  	digitalWrite(46 + offset, LOW);
+	  	delayMicroseconds(5);  
+		duration = pulseIn(47 + offset, HIGH);
+	  	distance += duration/58.2;
+	  	++counter;
+	  	delay(5);
+	  }
+	distance /= 5;
   	return distance;
 }
-
-//NEEDS COMPLETION; USE IS QUESTIONABLE
-/*void mapDistancesToPosition(){
-	float[4] sonarDistances = {0,0,0,0}; //index correlation: 0 front 1 left 2 right 3 back
-	for (int i = 0; i < 0; ++i){
-		sonarDistances[i] = detectDistances(i);
+void robot::changeOrientation(int directionOfTurn){
+	//direction of turn: 0 == left; 1 == right
+	Serial.println("changeOrientation function");
+	if (directionOfTurn){
+		++(*this).currentDirection;
+		if((*this).currentDirection > 4)
+			(*this).currentDirection -= 4;
 	}
-
+	else{
+		--(*this).currentDirection;
+		if((*this).currentDirection < 0)
+			(*this).currentDirection += 4;
+	}
 	return;
-}*/
-
+}
 void robot::turnLeft(){
-        Serial.println("turnLeft function");
+    Serial.println("turnLeft function");
 	(*this).currentDirection += 1;
 	if ((*this).currentDirection > 4)
 		(*this).currentDirection -= 4;
@@ -108,10 +124,12 @@ void robot::turnLeft(){
 	digitalWrite((*this).myMotors[1], LOW);
 	digitalWrite((*this).myMotors[2], LOW);
 	digitalWrite((*this).myMotors[3], HIGH);
+	delay(800);
+	(*this).stop();
+	(*this).changeOrientation(0);
 }
-
 void robot::turnRight(){
-        Serial.println("turnRight function");
+    Serial.println("turnRight function");
 	(*this).currentDirection -= 1;
 	if ((*this).currentDirection < 0)
 		(*this).currentDirection += 4;
@@ -119,91 +137,92 @@ void robot::turnRight(){
 	digitalWrite((*this).myMotors[1], HIGH);
 	digitalWrite((*this).myMotors[2], HIGH);
 	digitalWrite((*this).myMotors[3], LOW);
+	delay(800);
+	(*this).stop();
+	(*this).changeOrientation(1);
 }
-
 void robot::driveForward(int sideWallToFollow){
-//        Serial.println("Forward Function");
-	digitalWrite((*this).myMotors[0], HIGH);
-	digitalWrite((*this).myMotors[1], LOW);
-	digitalWrite((*this).myMotors[2], HIGH);
-	digitalWrite((*this).myMotors[3], LOW);
-        Serial.println((*this).detectDistances(0));
+	//Serial.println("Forward Function");
+	(*this).go();
+    Serial.println((*this).detectDistances(0));
 	while((*this).detectDistances(0) > 5){
-                Serial.println((*this).detectDistances(sideWallToFollow));
-		if ((*this).detectDistances(sideWallToFollow) > 10 + 2){
-                Serial.println("distance > 10");
-			switch(sideWallToFollow){
-		            case 1: analogWrite(motorEnablePins[1], 192);
-                                    analogWrite(motorEnablePins[0], 255);
-                                    Serial.println("Left wheel is weak - 1"); 
-                                    delay(200);
-                                    analogWrite(motorEnablePins[1], 255);
-                                    analogWrite(motorEnablePins[0], 255);
-                                    delay(150);
-                                    analogWrite(motorEnablePins[1], 255);
-                                    analogWrite(motorEnablePins[0], 192);
-                                    delay(200);
-                                    
-                                    break;
-			    case 3: analogWrite(motorEnablePins[0], 192);
-                                    analogWrite(motorEnablePins[1], 255);
-                                    Serial.println("Right wheel is weak - 1");
-                                    delay(200);
-                                    analogWrite(motorEnablePins[1], 255);
-                                    analogWrite(motorEnablePins[0], 255);
-                                    delay(150);
-                                    analogWrite(motorEnablePins[0], 255);
-                                    analogWrite(motorEnablePins[1], 192);
-                                    delay(200);
-                                    break;
-			}
-		}else if((*this).detectDistances(sideWallToFollow) < 10 - 2){
-                         Serial.println("distance < 10");
-                         switch(sideWallToFollow){
-		            case 3: analogWrite(motorEnablePins[1], 192);
-                                    analogWrite(motorEnablePins[0], 255);
-                                    Serial.println("Left wheel is weak - 1"); 
-                                    delay(500);
-                                    analogWrite(motorEnablePins[1], 255);
-                                    analogWrite(motorEnablePins[0], 255);
-                                    delay(500);
-                                    analogWrite(motorEnablePins[1], 255);
-                                    analogWrite(motorEnablePins[0], 192);
-                                    delay(500);
-                                    
-                                    break;
-			    case 1: analogWrite(motorEnablePins[0], 192);
-                                    analogWrite(motorEnablePins[1], 255);
-                                    Serial.println("Right wheel is weak - 1");
-                                    delay(500);
-                                    analogWrite(motorEnablePins[1], 255);
-                                    analogWrite(motorEnablePins[0], 255);
-                                    delay(500);
-                                    analogWrite(motorEnablePins[0], 255);
-                                    analogWrite(motorEnablePins[1], 192);
-                                    delay(500);
-                                    break;
-			}
-                }else{
+        Serial.print("Side Distance: ");
+        Serial.println((*this).detectDistances(sideWallToFollow));
+		if ((*this).detectDistances(sideWallToFollow) > 10){
+            Serial.println("distance > 10");
+			(*this).reAdjust(sideWallToFollow, TOOFAR);
+		}
+		else if((*this).detectDistances(sideWallToFollow) < 7.5){
+			Serial.println("distance < 7.5");
+            (*this).reAdjust(sideWallToFollow, TOOCLOSE);        
+		}
+		else{
 			analogWrite(motorEnablePins[0],255);
 			analogWrite(motorEnablePins[1],255);
 		}
 	delay(50);
-        }
-        
-        Serial.println("stopping");
+    }
+    (*this).stop();    
+	return;
+}
+void robot::reAdjust(int sideWallToFollow, int whichWay){
+	Serial.print("reAdjust function: ");
+	int i; // 1
+	int j; // 0
+	if(sideWallToFollow == 1 && whichWay == TOOFAR){
+		//TURN RIGHT
+		Serial.println("case 1");
+		i = 0;
+		j = 1;
+	}
+	else if(sideWallToFollow == 1 && whichWay == TOOCLOSE){
+		//TURN LEFT
+		Serial.println("case 2");
+		i = 1;
+		j = 0;
+	}
+	if(sideWallToFollow == 3 && whichWay == TOOFAR){
+		//TURN LEFT
+		Serial.println("case 3");
+		i = 0; //used to be 1, 0, switched for testing
+		j = 1;
+	}
+	else if(sideWallToFollow == 3 && whichWay == TOOCLOSE){
+		//TURN RIGHT
+		Serial.println("case 4");
+		i = 1;
+		j = 0;
+	}
+	
+    analogWrite(motorEnablePins[i], 192);
+    analogWrite(motorEnablePins[j], 255);
+    delay(250);
+    analogWrite(motorEnablePins[i], 255);
+    analogWrite(motorEnablePins[j], 255);
+    delay(300);
+    analogWrite(motorEnablePins[i], 255);
+    analogWrite(motorEnablePins[j], 192);
+    delay(400);
+}
+void robot::go(){
+	digitalWrite((*this).myMotors[0], HIGH);
+	digitalWrite((*this).myMotors[1], LOW);
+	digitalWrite((*this).myMotors[2], HIGH);
+	digitalWrite((*this).myMotors[3], LOW);
+}
+void robot::stop(){
+	Serial.println("stop function");
 	digitalWrite((*this).myMotors[0], LOW);
 	digitalWrite((*this).myMotors[1], LOW);
 	digitalWrite((*this).myMotors[2], LOW);
 	digitalWrite((*this).myMotors[3], LOW);
-        
-	return;
 }
 //CURRENTLY WORKING ON MOVE ALGORITHM. CONTINUE HERE AND/OR IN THE DRIVEFORWARD/TURN FUNCTIONS
-void robot::move(int xLocation, int yLocation){
-	while ((*this).robotLocation[0] - xLocation > 10 || (*this).robotLocation[1] - yLocation > 10 ){
-
-	}
+void robot::moveToHopper(){
+}
+void robot::moveToGameboard(){
+}
+void robot::grabBall(){
 }
 
 void robot::incBallCount(){
@@ -212,27 +231,24 @@ void robot::incBallCount(){
 }
 
 void robot::setState(int state){
-//  Serial.println("setState function");
+	//  Serial.println("setState function");
   (*this).currentState = state;
   return;
 }
 
-int robot::getCurrentState(){
-
-	return (*this).currentState;
-}
+int robot::getCurrentState(){return (*this).currentState;}
 
 void robot::doTaskA(){
-//        Serial.println("In function A");
+	//        Serial.println("In function A");
   	(*this).currentState = 2;
 	return;
 }
 
 void robot::doTaskB(){
-        (*this).driveForward(3);
-        //(*this).stop();
-        //(*this).driveForward(3);
-        //(*this).setState(3);
+    (*this).driveForward(3);
+    //(*this).stop();
+    //(*this).driveForward(3);
+    //(*this).setState(3);
 	//MOVEMENT TO SPECIFIED LOCATION (X,Y)
 	return;	
 }
@@ -257,7 +273,6 @@ int inputPinsArray[4] = {47,49,51,53};
 
 robot myRobot;
 
-
 void setup(){
 	
 	Serial.begin(9600);
@@ -270,9 +285,8 @@ void setup(){
 }
 
 void loop(){
-  
-//        Serial.print("Current State: ");
-        Serial.println(myRobot.getCurrentState());
+	//        Serial.print("Current State: ");
+    Serial.println(myRobot.getCurrentState());
 	switch(myRobot.getCurrentState()){
 		case 1: myRobot.doTaskA(); break;
 		case 2: myRobot.doTaskB(); break;
