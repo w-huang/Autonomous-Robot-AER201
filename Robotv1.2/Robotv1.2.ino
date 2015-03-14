@@ -1,15 +1,18 @@
 #include <Servo.h>
 #define TOOCLOSE 1
 #define TOOFAR 2
-
+#define OPEN 1
+#define CLOSE 0
+//THIS IS THE LATEST EDITION: IT HAS NOT BEEN TESTED!!!! The .ino uses the PREVIOUS, WORKING ITERATION OF WALL FOLLOWING/ DOING LAPS
 class robot{
 	public:
 		robot(); //constructor
 		float detectDistances(int);
 		int getCurrentState();
-		int checkForReAdjustment(int);
-		bool startButtonPressed;
+		int checkForReAdjustment(int,int);
+		int readIrSensor();
         void setState(int);
+        void moveGate(int);
 		void incBallCount();
 		void moveToHopper();
 		void moveToGameboard();
@@ -17,6 +20,7 @@ class robot{
 		void turnRight();
 		void stop();
 		void go();
+		void reverse();
 		void changeOrientation(int);
 		void reAdjust(int, int);
         void grabBall();
@@ -25,7 +29,7 @@ class robot{
 		void doTaskC();
 		void doTaskD();
 		void doTaskE();
-		void driveForward(int);
+		void driveForward(int, int);
 	private:
 		//ones that the robot will sense
 		int currentDirection; //1 = north, 2 = west, 3 = south, 4 = east
@@ -40,13 +44,13 @@ class robot{
 		int dummyLocationX;
 		int dummyLocationY;
 		//robot components
-		int IRPin;
+		int IRSensorPin;
 		int sonarPins[12]; //0,1 front; 2,3 left back; 4,5 left front; 6,7 back; 8,9 right back; 10, 11 right front.
-		Servo myServo[2]; //
+		Servo smallGate; //
+		Servo bigArm;
 		int myMotors[4]; // Right: index 0, 1; Left: index 2,3
 		int motorEnablePins[2]; //left = 4, index 0, right = 5, index 1
 };
-
 robot::robot(){
     Serial.println("robot constructor function");
 	//constructor for robot class; initializes the necessary hard-coded values such as hopper location, motor pins, etc.
@@ -62,19 +66,18 @@ robot::robot(){
     currentDirection = 1;
     dummyLocationX = 50;
     dummyLocationY = 50;
-	IRPin = A0;
+	IRSensorPin = A0;
     robotLocation[0] = 0;
     robotLocation[1] = 0;
     gameBoardLocation[0] = 0;
 	gameBoardLocation[1] = 100;
 	currentState = 1;
-	myServo[0].attach(9);
-	myServo[1].attach(10);
-	myServo[0].write(0);
-	myServo[1].write(0);
+	smallGate.attach(9);
+	bigArm.attach(10);
+	smallGate.write(0);
+	bigArm.write(0);
+	ballCounter = 0;
 }
-
-
 float robot::detectDistances(int side)  {
     //Serial.print("detectDistances function");
 	//returns the distance measured by the sonar on the specified side
@@ -82,8 +85,8 @@ float robot::detectDistances(int side)  {
 	int counter = 0;
 	int offset = side * 2;
 	int duration;
-	float distance[5];
-	while(counter < 5){
+	float distance[7];
+	while(counter < 7){
 		digitalWrite(42 + offset,LOW);
 	  	delayMicroseconds(5);
 	  	digitalWrite(42 + offset, HIGH);
@@ -98,7 +101,7 @@ float robot::detectDistances(int side)  {
 	  	++counter;
 	  	delay(5);
 	  }
-  	return distance[2];
+  	return distance[4];
 }
 void robot::changeOrientation(int directionOfTurn){
 	//direction of turn: 0 == left; 1 == right
@@ -142,8 +145,8 @@ void robot::turnRight(){
 	(*this).stop();
 	(*this).changeOrientation(1);
 }
-
-int robot::checkForReAdjustment(int sideToFollowBackSonar){
+//WAS WORKING ON THIS ONE
+int robot::checkForReAdjustment(int sideToFollowBackSonar, int distanceToFollow){
 	Serial.println("checkForReAdjustment Function");
 
     Serial.print("Side Distance from BACK: ");
@@ -155,24 +158,39 @@ int robot::checkForReAdjustment(int sideToFollowBackSonar){
     float frontDistance = detectDistances(sideToFollowBackSonar + 1);
 
     if (frontDistance - backDistance > 1.4){
+    	if(frontDistance - distanceToFollow > 1){
+    		if (backDistance - distanceToFollow > 1){
+    			return TOOFAR;
+    		}
+    		return TOOCLOSE;
+    	}
+    }
+    else if (frontDistance - backDistance < -1.4){
+    	if(backDistance - distanceToFollow > 1){
+    		if (backDistance - distanceToFollow > 1){
+    			return TOOCLOSE;
+    		}
+    		return TOOFAR;
+    	}	
+    }
+    //THIS SECTION: INSTEAD OF USING > DIRECTLY, APPLY A - B > C TYPE OF COMPARISON FOR ERROR TOLERANCE
+    else if(frontDistance > distanceToFollow && backDistance > distanceToFollow){
     	return TOOFAR;
     }
 
-    else if (frontDistance - backDistance < -1.4){
+    else if(frontDistance < distanceToFollow && backDistance < distanceToFollow){
     	return TOOCLOSE;
     }
 	return 0;
 }
-
-
-void robot::driveForward(int sideWallToFollow){
+void robot::driveForward(int sideWallToFollow, int distanceToFollow){
 	//sideWallToFollow should be the BACK sonar of the side of interest
 	Serial.println("driveForward Function");
 	int reAdjustVariable;
 	(*this).go();
     Serial.println((*this).detectDistances(0));
 	while((*this).detectDistances(0) > 25){
-        reAdjustVariable = (*this).checkForReAdjustment(sideWallToFollow);
+        reAdjustVariable = (*this).checkForReAdjustment(sideWallToFollow, distanceToFollow);
         if (reAdjustVariable){
         	(*this).reAdjust(sideWallToFollow, reAdjustVariable);
         }
@@ -213,10 +231,10 @@ void robot::reAdjust(int sideWallToFollow, int whichWay){
 
     analogWrite(motorEnablePins[i], 128);
     analogWrite(motorEnablePins[j], 255);
-    delay(350);
+    delay(120);
     analogWrite(motorEnablePins[i], 255);
     analogWrite(motorEnablePins[j], 255);
-    delay(300);/*
+    delay(100);/*
     analogWrite(motorEnablePins[i], 255);
     analogWrite(motorEnablePins[j], 128);
     delay(200);*/
@@ -228,6 +246,13 @@ void robot::go(){
 	digitalWrite((*this).myMotors[2], HIGH);
 	digitalWrite((*this).myMotors[3], LOW);
 }
+void robot::reverse(){
+	Serial.println("reverse function");
+	digitalWrite((*this).myMotors[1], HIGH);
+	digitalWrite((*this).myMotors[0], LOW);
+	digitalWrite((*this).myMotors[3], HIGH);
+	digitalWrite((*this).myMotors[2], LOW);
+}
 void robot::stop(){
 	Serial.println("stop function");
 	digitalWrite((*this).myMotors[0], LOW);
@@ -235,35 +260,59 @@ void robot::stop(){
 	digitalWrite((*this).myMotors[2], LOW);
 	digitalWrite((*this).myMotors[3], LOW);
 }
-//CURRENTLY WORKING ON MOVE ALGORITHM. CONTINUE HERE AND/OR IN THE DRIVEFORWARD/TURN FUNCTIONS
 void robot::moveToHopper(){
 }
 void robot::moveToGameboard(){
 }
-void robot::grabBall(){
+int robot::readIrSensor(){
+	Serial.println("readIrSensor function");
+	int value = analogRead((*this).IRSensorPin);
+	return value;
 }
-
+void robot::grabBall(){
+	int IRValue = 0;
+	(*this).go();
+	while (true){
+		if(IRValue = (*this).readIrSensor() < 950){
+			delay(300);
+			(*this).stop();
+			(*this).moveGate(CLOSE);
+			(*this).reverse();
+			delay(500);
+			(*this).incBallCount();
+			return;	
+		}
+	}
+}
+void robot::moveGate(int openOrClose){
+	Serial.println("moveGate function");
+	if (openOrClose == OPEN){
+		(*this).smallGate.write(0);
+		return;
+	}
+	(*this).smallGate.write(94);
+	return;
+}
 void robot::incBallCount(){
 	(*this).ballCounter += 1;
 	return;
 }
-
 void robot::setState(int state){
 	//  Serial.println("setState function");
   (*this).currentState = state;
   return;
 }
-
-int robot::getCurrentState(){return (*this).currentState;}
-
+int robot::getCurrentState(){
+	//returns currentstate
+	return (*this).currentState;
+}
 void robot::doTaskA(){
 	//        Serial.println("In function A");
   	(*this).currentState = 2;
 	return;
 }
-
 void robot::doTaskB(){
-    (*this).driveForward(4);
+    (*this).driveForward(4,15);
     (*this).turnLeft();
     //(*this).stop();
     //(*this).driveForward(3);
@@ -271,17 +320,15 @@ void robot::doTaskB(){
 	//MOVEMENT TO SPECIFIED LOCATION (X,Y)
 	return;	
 }
-
 void robot::doTaskC(){
+	(*this).grabBall();
 	(*this).setState(4);
 	return;
 }
-
 void robot::doTaskD(){
 	(*this).setState(5);
 	return;
 }
-
 void robot::doTaskE(){
 	(*this).setState(2);
 	return;
@@ -289,22 +336,19 @@ void robot::doTaskE(){
 //Main code
 int outputPinsArray[14] = {4,5,30,31,32,33,9,10,42,44,46,48,50,52};
 int inputPinsArray[6] = {43,45,47,49,51,53};
-
 robot myRobot;
 
 void setup(){
-	
 	Serial.begin(9600);
-        for(int i = 0; i < sizeof(outputPinsArray)/sizeof(outputPinsArray[0]); ++i){
-                Serial.println(outputPinsArray[i]);
+    for(int i = 0; i < sizeof(outputPinsArray)/sizeof(outputPinsArray[0]); ++i){
+    	Serial.println(outputPinsArray[i]);
 		pinMode(outputPinsArray[i], OUTPUT);
 	}
 	for(int i = 0; i < sizeof(inputPinsArray)/sizeof(inputPinsArray[0]); ++i){
-         	pinMode(inputPinsArray[i], INPUT);
+        pinMode(inputPinsArray[i], INPUT);
 	}
-        Serial.println("END OF SETUPS");
+    Serial.println("END OF SETUPS");
 }
-
 void loop(){
 	//        Serial.print("Current State: ");
     Serial.println(myRobot.getCurrentState());
