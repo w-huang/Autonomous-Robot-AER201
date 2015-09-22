@@ -1,10 +1,10 @@
 # Autonomous-Robot-AER201
 
-This is the logic
+This is the logic for team WAC's AER201 Robot. The robot is designed electromechanically and logically to compete in the a game outlined by the teaching staff of AER201 2015.
 
 The rules were as follows:
 
-1) There is a 1.8m x 3.2m field as below (read as raw):
+1) There is a 1.8m x 3.2m game field as below (read as raw):
 
 |===================||===================|
 
