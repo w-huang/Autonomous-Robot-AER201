@@ -6,13 +6,13 @@ The rules were as follows:
 
 1) There is a 1.8m x 3.2m field as below:
 
-|===================||===================|
-|                   ||                   |
-|                   ||                   |
-|                   ||                   |
-|                   ||                   |
-|                   ||                   |
-|                   ||                   |
+|===================||===================|\n
+|                   ||                   |\n
+|                   ||                   |\n
+|                   ||                   |\n
+|                   ||                   |\n
+|                   ||                   |\n
+|                   ||                   |\n
 |===================||===================|
 
 Two teams (i.e. robots) will face off against each other. Each robot will be placed in one of the 1.8 x 1.6m half-fields.
