@@ -1,6 +1,6 @@
 # Autonomous-Robot-AER201
 
-This is the logic for team WAC's AER201 Robot. The robot is designed electromechanically and logically to compete in the a game outlined by the teaching staff of AER201 2015.
+This is the logic for team WAC's AER201 Robot. The robot is designed electromechanically and logically to compete in the a game outlined by the teaching staff of AER201 2015. Many decisions were made due to the inconsistencies of different gameboards (some had bumps, some lines were less detectable, etc.), resulting seemingly "poor" choices (such as the use of time delays for turning), but few alternatives. 
 
 The rules were as follows:
 
