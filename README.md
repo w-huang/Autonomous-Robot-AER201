@@ -7,13 +7,9 @@ The rules were as follows:
 1) There is a 1.8m x 3.2m field as below (read as raw):
 
 |===================||===================|
-
 |                   ||                   |
-
 |                   ||                   |
-
 |                   ||                   |
-
 |                   ||                   |
 
 |                   ||                   |
